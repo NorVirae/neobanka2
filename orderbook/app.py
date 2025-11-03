@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -13,7 +13,7 @@ from helper.api_service import APIService
 
 # Import the TradeSettlementClient
 from src.trade_settlement_client import (
-    SettlementClient,
+    SettlementClientSame,
     # AllowanceChecker,
     # AllowanceManager,
 )
@@ -176,7 +176,7 @@ app.add_middleware(
 )
 
 # Global settlement client - initialize on startup
-settlement_client: Optional[SettlementClient] = None
+settlement_client: Optional[SettlementClientSame] = None
 # allowance_checker: Optional[AllowanceChecker] = None
 # allowance_manager: Optional[AllowanceManager] = None
 
@@ -218,23 +218,11 @@ TOKEN_ADDRESSES = {
 print(SUPPORTED_NETWORKS, "SUPPORTED NETWORKS IN APP.PY")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global settlement_client
-    logger.error("SHOULD RUN ON STARTUP!")
-    settlement_client = api_service.register_startup_event(
-        WEB3_PROVIDER=SUPPORTED_NETWORKS["hedera"]["rpc"],
-        TRADE_SETTLEMENT_CONTRACT_ADDRESS=TRADE_SETTLEMENT_CONTRACT_ADDRESS,
-        PRIVATE_KEY=PRIVATE_KEY,
-    )
-    yield
-
-
 @app.post("/api/register_order")
 async def register_order(request: Request):
     logger.info("Got here")
  
-    settlement_client = SettlementClient(
+    settlement_client = SettlementClientSame(
         web3_provider=SUPPORTED_NETWORKS["hedera"]["rpc"],
         contract_address=TRADE_SETTLEMENT_CONTRACT_ADDRESS,
         private_key=PRIVATE_KEY,
@@ -256,27 +244,15 @@ async def register_order(request: Request):
     )
 
 
-@app.post("/api/register_order_cross")
+@app.post("/api/register_order_crosses")
 async def register_order_cross(request: Request):
-    settlement_client = SettlementClient(
-        web3_provider=SUPPORTED_NETWORKS["hedera"]["rpc"],
-        contract_address=TRADE_SETTLEMENT_CONTRACT_ADDRESS,
-        private_key=PRIVATE_KEY,
-    )
     return await api_service.register_order_cross(
         request=request,
+        supported_networks=SUPPORTED_NETWORKS,
+        private_key=PRIVATE_KEY,
         order_books=cross_order_books,
-        WEB3PROVIDER=SUPPORTED_NETWORKS["hedera"]["rpc"],
-        TOKEN_ADDRESSES=TOKEN_ADDRESSES,
-        SUPPORTED_NETWORKS=SUPPORTED_NETWORKS,
-        TRADE_SETTLEMENT_CONTRACT_ADDRESS=TRADE_SETTLEMENT_CONTRACT_ADDRESS,
-        CONTRACT_ABI=CONTRACT_ABI,
-        PRIVATE_KEY=PRIVATE_KEY,
-        settlement_client=settlement_client,
-        activity_log=cross_activity_log,
-        activity_file_path=CROSS_ACTIVITY_LOG_PATH,
-        append_file=append_cross_activity_file,
-        order_signatures=order_signatures,
+        activity_log=activity_log,
+        activity_file_path=ACTIVITY_LOG_PATH,
     )
 
 
@@ -485,7 +461,7 @@ async def faucet(request: Request):
         if not token_addr:
             return {"status_code": 0, "message": f"token not configured for {asset} on {network}"}
 
-        client = SettlementClient(net.get("rpc"), net.get("contract_address"), PRIVATE_KEY)
+        client = SettlementClientSame(net.get("rpc"), net.get("contract_address"), PRIVATE_KEY)
         # Default decimals: HBAR 18, USDT 6 in our setup
         decimals = 18 if asset == "HBAR" else 6
         res = client.mint_token(token_addr, to, amount, token_decimals=decimals)

@@ -111,3 +111,7 @@
 {"type": "order_placed", "symbol": "HBAR_USDT", "orderId": 1, "account": "0x01B144754760F89Dc0179a22BaFa426427ad9592", "side": "bid", "price": 0.1926, "quantity": 100.0, "timestamp": 1761937784367}
 {"type": "order_placed", "symbol": "HBAR_USDT", "orderId": 1, "account": "0x19BEa165cc295752D0FcE4851Af77420F163e279", "side": "ask", "price": 0.1928, "quantity": 50.0, "timestamp": 1761937878873}
 {"type": "trade_executed", "symbol": "HBAR_USDT", "price": 0.1926, "quantity": 50.0, "timestamp": 1761937878873, "txHash": "d1c71ab84c66fbd7656595cecc4c2b6b8b79cba256717f54c4c9c08b0041e878", "txHashSource": "d1c71ab84c66fbd7656595cecc4c2b6b8b79cba256717f54c4c9c08b0041e878"}
+{"type": "order_placed", "symbol": "cNGN_USDT", "orderId": 1, "account": "0x19BEa165cc295752D0FcE4851Af77420F163e279", "side": "bid", "price": 0.00061, "quantity": 100.0, "timestamp": 1762025361935}
+{"type": "order_placed", "symbol": "HBAR_USDT", "orderId": 1, "account": "0x19BEa165cc295752D0FcE4851Af77420F163e279", "side": "bid", "price": 0.196, "quantity": 150.0, "timestamp": 1762025465249}
+{"type": "order_placed", "symbol": "HBAR_USDT", "orderId": 1, "account": "0x01B144754760F89Dc0179a22BaFa426427ad9592", "side": "ask", "price": 0.1963, "quantity": 150.0, "timestamp": 1762025535862}
+{"type": "order_placed", "symbol": "HBAR_USDT", "orderId": 1, "account": "0x01B144754760F89Dc0179a22BaFa426427ad9592", "side": "bid", "price": 0.1932, "quantity": 100.0, "timestamp": 1762102421899}

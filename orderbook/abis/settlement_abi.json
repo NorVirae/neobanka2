@@ -1,31 +1,8 @@
 [
-    {"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
     {
         "inputs": [],
-        "name": "ECDSAInvalidSignature",
-        "type": "error"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "length",
-                "type": "uint256"
-            }
-        ],
-        "name": "ECDSAInvalidSignatureLength",
-        "type": "error"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "bytes32",
-                "name": "s",
-                "type": "bytes32"
-            }
-        ],
-        "name": "ECDSAInvalidSignatureS",
-        "type": "error"
+        "stateMutability": "nonpayable",
+        "type": "constructor"
     },
     {
         "inputs": [
@@ -53,6 +30,37 @@
         "inputs": [],
         "name": "ReentrancyGuardReentrantCall",
         "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "settledChainId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "failedChainId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "AsymmetricSettlementDetected",
+        "type": "event"
     },
     {
         "anonymous": false,
@@ -107,6 +115,49 @@
             }
         ],
         "name": "CrossChainTradeSettled",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "chainId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "EmergencyRefund",
         "type": "event"
     },
     {
@@ -222,6 +273,90 @@
         "type": "event"
     },
     {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "chainId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "bool",
+                "name": "isSourceChain",
+                "type": "bool"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "reason",
+                "type": "string"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "SettlementFailed",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "SETTLEMENT_TIMEOUT",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "sourceChainId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "destinationChainId",
+                "type": "uint256"
+            }
+        ],
+        "name": "checkAsymmetricSettlement",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "isAsymmetric",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "settledChainId",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [
             {
                 "internalType": "address",
@@ -276,6 +411,111 @@
     {
         "inputs": [
             {
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "orderId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party1",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party2",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party1ReceiveWallet",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party2ReceiveWallet",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "baseAsset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "quoteAsset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "price",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "quantity",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "party1Side",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "party2Side",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "sourceChainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "destinationChainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "nonce1",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "nonce2",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct TradeSettlement.CrossChainTradeData",
+                "name": "tradeData",
+                "type": "tuple"
+            },
+            {
+                "internalType": "bytes",
+                "name": "",
+                "type": "bytes"
+            }
+        ],
+        "name": "emergencyRefundAsymmetricSettlement",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
                 "internalType": "address",
                 "name": "",
                 "type": "address"
@@ -310,6 +550,45 @@
             {
                 "internalType": "bool",
                 "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            }
+        ],
+        "name": "getSettlementStatus",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "sourceChainSettled",
+                "type": "bool"
+            },
+            {
+                "internalType": "bool",
+                "name": "destinationChainSettled",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "sourceChainTimestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "destinationChainTimestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "refunded",
                 "type": "bool"
             }
         ],
@@ -437,15 +716,28 @@
     },
     {
         "inputs": [
-            { "internalType": "bytes32", "name": "", "type": "bytes32" },
-            { "internalType": "uint256", "name": "", "type": "uint256" }
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
         ],
         "name": "orderLocksByChain",
-        "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ],
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
         "stateMutability": "view",
         "type": "function"
     },
-    {"inputs":[{"components":[{"internalType":"bytes32","name":"orderId","type":"bytes32"},{"internalType":"address","name":"party1","type":"address"},{"internalType":"address","name":"party2","type":"address"},{"internalType":"address","name":"party1ReceiveWallet","type":"address"},{"internalType":"address","name":"party2ReceiveWallet","type":"address"},{"internalType":"address","name":"baseAsset","type":"address"},{"internalType":"address","name":"quoteAsset","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"uint256","name":"quantity","type":"uint256"},{"internalType":"string","name":"party1Side","type":"string"},{"internalType":"string","name":"party2Side","type":"string"},{"internalType":"uint256","name":"sourceChainId","type":"uint256"},{"internalType":"uint256","name":"destinationChainId","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce1","type":"uint256"},{"internalType":"uint256","name":"nonce2","type":"uint256"}],"internalType":"struct TradeSettlement.CrossChainTradeData","name":"tradeData","type":"tuple"}],"name":"settleSameChainTrade","outputs":[],"stateMutability":"nonpayable","type":"function"},
     {
         "inputs": [],
         "name": "owner",
@@ -466,7 +758,229 @@
         "stateMutability": "nonpayable",
         "type": "function"
     },
-    {"inputs":[{"components":[{"internalType":"bytes32","name":"orderId","type":"bytes32"},{"internalType":"address","name":"party1","type":"address"},{"internalType":"address","name":"party2","type":"address"},{"internalType":"address","name":"party1ReceiveWallet","type":"address"},{"internalType":"address","name":"party2ReceiveWallet","type":"address"},{"internalType":"address","name":"baseAsset","type":"address"},{"internalType":"address","name":"quoteAsset","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"uint256","name":"quantity","type":"uint256"},{"internalType":"string","name":"party1Side","type":"string"},{"internalType":"string","name":"party2Side","type":"string"},{"internalType":"uint256","name":"sourceChainId","type":"uint256"},{"internalType":"uint256","name":"destinationChainId","type":"uint256"},{"internalType":"uint256","name":"timestamp","type":"uint256"},{"internalType":"uint256","name":"nonce1","type":"uint256"},{"internalType":"uint256","name":"nonce2","type":"uint256"}],"internalType":"struct TradeSettlement.CrossChainTradeData","name":"tradeData","type":"tuple"},{"internalType":"bool","name":"isSourceChain","type":"bool"}],"name":"settleCrossChainTrade","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "orderId",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "failedChainId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "isSourceChain",
+                "type": "bool"
+            },
+            {
+                "internalType": "string",
+                "name": "reason",
+                "type": "string"
+            }
+        ],
+        "name": "reportSettlementFailure",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "orderId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party1",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party2",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party1ReceiveWallet",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party2ReceiveWallet",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "baseAsset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "quoteAsset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "price",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "quantity",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "party1Side",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "party2Side",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "sourceChainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "destinationChainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "nonce1",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "nonce2",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct TradeSettlement.CrossChainTradeData",
+                "name": "tradeData",
+                "type": "tuple"
+            },
+            {
+                "internalType": "bool",
+                "name": "isSourceChain",
+                "type": "bool"
+            }
+        ],
+        "name": "settleCrossChainTrade",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "orderId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party1",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party2",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party1ReceiveWallet",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "party2ReceiveWallet",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "baseAsset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "quoteAsset",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "price",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "quantity",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "party1Side",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "party2Side",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "sourceChainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "destinationChainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "nonce1",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "nonce2",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct TradeSettlement.CrossChainTradeData",
+                "name": "tradeData",
+                "type": "tuple"
+            }
+        ],
+        "name": "settleSameChainTrade",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
     {
         "inputs": [
             {
@@ -489,6 +1003,69 @@
     {
         "inputs": [
             {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "settlementByChain",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "name": "settlementStatuses",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "sourceChainSettled",
+                "type": "bool"
+            },
+            {
+                "internalType": "bool",
+                "name": "destinationChainSettled",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "sourceChainTimestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "destinationChainTimestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "refunded",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
                 "internalType": "address",
                 "name": "newOwner",
                 "type": "address"
@@ -499,7 +1076,6 @@
         "stateMutability": "nonpayable",
         "type": "function"
     },
-    
     {
         "inputs": [
             {

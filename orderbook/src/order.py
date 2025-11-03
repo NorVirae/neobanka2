@@ -13,7 +13,7 @@ class Order(object):
         self.price = Decimal(quote['price']) # decimal representing price (currency)
         self.order_id = int(quote['order_id'])
         self.trade_id = quote['trade_id']
-        self.private_key = quote['private_key']
+        # self.private_key = quote['private_key']
         # doubly linked list to make it easier to re-order Orders for a particular price point
         self.next_order = None
         self.prev_order = None

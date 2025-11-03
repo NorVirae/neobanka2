@@ -5,8 +5,12 @@ This client handles all interactions with the Trade Settlement smart contract,
 including escrow management, token approvals, signature creation, and trade settlement.
 """
 
+from decimal import Decimal
+from enum import Enum
 import json
 import os
+from time import time
+from pydantic.dataclasses import dataclass
 from web3 import Web3
 from eth_account import Account
 from eth_account.messages import encode_defunct
@@ -25,15 +29,46 @@ with open(os.path.join(_ABIS_DIR, "settlement_abi.json"), "r", encoding="utf-8")
     TRADE_SETTLEMENT_ABI = json.load(f)
 
 
-class SettlementClient:
+class NetworkType(Enum):
+    HEDERA = "hedera"
+    ETHEREUM = "ethereum"
+
+
+@dataclass
+class CrossChainOrder:
+    """Represents an order that can be matched cross-chain"""
+
+    order_id: str
+    account: str
+    side: str  # 'bid' or 'ask'
+    base_asset: str
+    quote_asset: str
+    price: Decimal
+    quantity: Decimal
+    from_network: str
+    to_network: str
+    receive_wallet: str
+    timestamp: int
+    network: NetworkType
+
+
+@dataclass
+class CrossChainMatch:
+    """Represents a matched cross-chain trade"""
+
+    source_order: CrossChainOrder
+    dest_order: CrossChainOrder
+    trade_id: str
+    matched_quantity: Decimal
+    matched_price: Decimal
+
+
+class SettlementClientSame:
     """
     Client for interacting with the Cross-Chain Trade Settlement contract
 
     This client provides methods for:
-    - Escrow deposits and withdrawals
-    - Token approvals
     - Balance checking
-    - Signature creation and verification
     - Cross-chain trade settlement
     """
 
@@ -68,137 +103,6 @@ class SettlementClient:
             print(f"✅ Account loaded: {self.account.address}")
 
     # ==================== ESCROW MANAGEMENT ====================
-
-    def deposit_to_escrow(
-        self,
-        token_address: str,
-        amount: float,
-        token_decimals: int = 18,
-        gas_price_gwei: int = 20,
-    ) -> Dict:
-        """
-        Deposit tokens into escrow
-
-        Args:
-            token_address: Address of the token to deposit
-            amount: Amount in token units (e.g., 100 for 100 USDT)
-            token_decimals: Token decimals (default 18)
-            gas_price_gwei: Gas price in gwei
-
-        Returns:
-            Transaction receipt dictionary
-        """
-        if not self.account:
-            raise ValueError("No private key provided for transaction signing")
-
-        try:
-            token_address = Web3.to_checksum_address(token_address)
-            amount_wei = int(amount * (10**token_decimals))
-
-            print(f"📥 Depositing {amount} tokens to escrow...")
-
-            # Build transaction
-            tx = self.contract.functions.depositToEscrow(
-                token_address, amount_wei
-            ).build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.web3.eth.get_transaction_count(self.account.address),
-                    "gas": 200000,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                }
-            )
-
-            # Sign and send
-            signed_tx = self.web3.eth.account.sign_transaction(tx, self.account.key)
-            tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
-
-            print(f"🚀 Transaction sent: {tx_hash.hex()}")
-            print("⏳ Waiting for confirmation...")
-
-            receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-
-            if receipt.status == 1:
-                print(f"✅ Deposit successful!")
-                print(f"   Gas used: {receipt.gasUsed}")
-                print(f"   Block: {receipt.blockNumber}")
-            else:
-                print("❌ Transaction failed")
-
-            return {
-                "success": receipt.status == 1,
-                "transaction_hash": receipt.transactionHash.hex(),
-                "gas_used": receipt.gasUsed,
-                "block_number": receipt.blockNumber,
-                "amount_deposited": amount,
-                "token": token_address,
-            }
-
-        except Exception as e:
-            print(f"❌ Deposit failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    def withdraw_from_escrow(
-        self,
-        token_address: str,
-        amount: float,
-        token_decimals: int = 18,
-        gas_price_gwei: int = 20,
-    ) -> Dict:
-        """
-        Withdraw tokens from escrow (only unlocked balance)
-
-        Args:
-            token_address: Address of the token to withdraw
-            amount: Amount in token units
-            token_decimals: Token decimals
-            gas_price_gwei: Gas price in gwei
-
-        Returns:
-            Transaction receipt dictionary
-        """
-        if not self.account:
-            raise ValueError("No private key provided for transaction signing")
-
-        try:
-            token_address = Web3.to_checksum_address(token_address)
-            amount_wei = int(amount * (10**token_decimals))
-
-            print(f"📤 Withdrawing {amount} tokens from escrow...")
-
-            tx = self.contract.functions.withdrawFromEscrow(
-                token_address, amount_wei
-            ).build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.web3.eth.get_transaction_count(self.account.address),
-                    "gas": 200000,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                }
-            )
-
-            signed_tx = self.web3.eth.account.sign_transaction(tx, self.account.key)
-            tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
-
-            print(f"🚀 Transaction sent: {tx_hash.hex()}")
-            receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-
-            if receipt.status == 1:
-                print(f"✅ Withdrawal successful!")
-            else:
-                print("❌ Transaction failed")
-
-            return {
-                "success": receipt.status == 1,
-                "transaction_hash": receipt.transactionHash.hex(),
-                "gas_used": receipt.gasUsed,
-                "amount_withdrawn": amount,
-                "token": token_address,
-            }
-
-        except Exception as e:
-            print(f"❌ Withdrawal failed: {e}")
-            return {"success": False, "error": str(e)}
 
     def check_escrow_balance(
         self, user_address: str, token_address: str, token_decimals: int = 18
@@ -253,249 +157,6 @@ class SettlementClient:
         except Exception:
             return 18
 
-    def lock_escrow_for_order(
-        self,
-        user_address: str,
-        token_address: str,
-        amount: float,
-        order_id: str,
-        token_decimals: int = 18,
-        gas_price_gwei: int = 20,
-    ) -> Dict:
-        """
-        Lock escrow funds for an order (owner-only function on the settlement contract).
-        """
-        if not self.account:
-            raise ValueError("No private key provided for transaction signing")
-
-        try:
-            # Convert order_id to bytes32
-            if isinstance(order_id, str):
-                if order_id.startswith("0x"):
-                    order_id_bytes = bytes.fromhex(order_id[2:].zfill(64))
-                else:
-                    order_id_bytes = Web3.keccak(text=order_id)
-            else:
-                order_id_bytes = order_id
-
-            amount_wei = int(amount * (10**token_decimals))
-            fn = self.contract.functions.lockEscrowForOrder(
-                Web3.to_checksum_address(user_address),
-                Web3.to_checksum_address(token_address),
-                amount_wei,
-                order_id_bytes,
-            )
-
-            # Preflight: estimate gas to surface revert reasons early
-            try:
-                gas_estimate = fn.estimate_gas({"from": self.account.address})
-                gas_limit = int(gas_estimate * 1.3)
-            except Exception as gas_err:
-                return {"success": False, "error": f"lock_estimate_failed: {gas_err}"}
-
-            tx = fn.build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.web3.eth.get_transaction_count(self.account.address),
-                    "gas": gas_limit,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                }
-            )
-
-            signed_tx = self.web3.eth.account.sign_transaction(tx, self.account.key)
-            tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
-            receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-            return {"success": receipt.status == 1, "transaction_hash": tx_hash.hex()}
-        except Exception as e:
-            print(f"❌ Lock escrow failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    def approve_token(
-        self,
-        token_address: str,
-        amount: Optional[float] = None,
-        token_decimals: int = 18,
-        gas_price_gwei: int = 20,
-    ) -> Dict:
-        """
-        Approve the settlement contract to spend tokens
-
-        Args:
-            token_address: Token to approve
-            amount: Amount to approve (None = unlimited)
-            token_decimals: Token decimals
-            gas_price_gwei: Gas price
-
-        Returns:
-            Transaction receipt
-        """
-        if not self.account:
-            raise ValueError("No private key provided for transaction signing")
-
-        try:
-            token_address = Web3.to_checksum_address(token_address)
-
-            # Unlimited approval if no amount specified
-            if amount is None:
-                amount_wei = 2**256 - 1
-                print(f"🔓 Approving unlimited spending for {token_address}...")
-            else:
-                amount_wei = int(amount * (10**token_decimals))
-                print(f"🔓 Approving {amount} tokens for spending...")
-
-            token_contract = self.web3.eth.contract(
-                address=token_address, abi=ERC20_ABI
-            )
-
-            tx = token_contract.functions.approve(
-                self.contract_address, amount_wei
-            ).build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.web3.eth.get_transaction_count(self.account.address),
-                    "gas": 100000,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                }
-            )
-
-            signed_tx = self.web3.eth.account.sign_transaction(tx, self.account.key)
-            tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
-
-            print(f"🚀 Approval transaction sent: {tx_hash.hex()}")
-            receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-
-            if receipt.status == 1:
-                print(f"✅ Approval successful!")
-            else:
-                print("❌ Approval failed")
-
-            return {
-                "success": receipt.status == 1,
-                "transaction_hash": receipt.transactionHash.hex(),
-                "gas_used": receipt.gasUsed,
-                "approved_amount": "UNLIMITED" if amount is None else amount,
-            }
-
-        except Exception as e:
-            print(f"❌ Approval failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    def check_token_allowance(
-        self, token_address: str, owner: str, token_decimals: int = 18
-    ) -> float:
-        """
-        Check token allowance for the settlement contract
-
-        Args:
-            token_address: Token address
-            owner: Owner address
-            token_decimals: Token decimals
-
-        Returns:
-            Current allowance amount
-        """
-        try:
-            token_contract = self.web3.eth.contract(
-                address=Web3.to_checksum_address(token_address), abi=ERC20_ABI
-            )
-
-            allowance = token_contract.functions.allowance(
-                Web3.to_checksum_address(owner), self.contract_address
-            ).call()
-
-            return allowance / (10**token_decimals)
-
-        except Exception as e:
-            print(f"❌ Error checking allowance: {e}")
-            return 0
-
-    def check_token_balance(
-        self, token_address: str, owner: str, token_decimals: int = 18
-    ) -> float:
-        """
-        Check token balance for an address
-
-        Args:
-            token_address: Token address
-            owner: Owner address
-            token_decimals: Token decimals
-
-        Returns:
-            Token balance
-        """
-        try:
-            token_contract = self.web3.eth.contract(
-                address=Web3.to_checksum_address(token_address), abi=ERC20_ABI
-            )
-
-            balance = token_contract.functions.balanceOf(
-                Web3.to_checksum_address(owner)
-            ).call()
-
-            return balance / (10**token_decimals)
-
-        except Exception as e:
-            print(f"❌ Error checking balance: {e}")
-            return 0
-
-    def mint_token(
-        self,
-        token_address: str,
-        to_address: str,
-        amount: float,
-        token_decimals: int = 18,
-        gas_price_gwei: int = 20,
-    ) -> Dict:
-        """
-        Mint mock tokens to an address (for test deployments where token supports mint()).
-        """
-        if not self.account:
-            raise ValueError("No private key provided for transaction signing")
-
-        try:
-            token_address = Web3.to_checksum_address(token_address)
-            to_address = Web3.to_checksum_address(to_address)
-            amount_wei = int(amount * (10**token_decimals))
-
-            # Minimal ABI for mint(address,uint256)
-            mint_abi = [
-                {
-                    "inputs": [
-                        {"internalType": "address", "name": "to", "type": "address"},
-                        {"internalType": "uint256", "name": "amount", "type": "uint256"},
-                    ],
-                    "name": "mint",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function",
-                }
-            ]
-
-            token_contract = self.web3.eth.contract(address=token_address, abi=mint_abi)
-            fn = token_contract.functions.mint(to_address, amount_wei)
-
-            try:
-                gas_estimate = fn.estimate_gas({"from": self.account.address})
-                gas_limit = int(gas_estimate * 1.3)
-            except Exception as gas_err:
-                return {"success": False, "error": f"mint_estimate_failed: {gas_err}"}
-
-            tx = fn.build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.web3.eth.get_transaction_count(self.account.address),
-                    "gas": gas_limit,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                }
-            )
-
-            signed = self.web3.eth.account.sign_transaction(tx, self.account.key)
-            tx_hash = self.web3.eth.send_raw_transaction(signed.raw_transaction)
-            receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-            return {"success": receipt.status == 1, "transaction_hash": tx_hash.hex()}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
     # ==================== NONCE MANAGEMENT ====================
 
     def get_user_nonce(self, user_address: str, token_address: str) -> int:
@@ -521,428 +182,7 @@ class SettlementClient:
             print(f"❌ Error getting nonce: {e}")
             return 0
 
-    # ==================== SIGNATURE CREATION ====================
-
-    def create_trade_signature(
-        self,
-        user_private_key: str,
-        order_id: str,
-        base_asset: str,
-        quote_asset: str,
-        price: float,
-        quantity: float,
-        side: str,
-        receive_wallet: str,
-        source_chain_id: int,
-        destination_chain_id: int,
-        timestamp: int,
-        nonce: int,
-        price_decimals: int = 18,
-        quantity_decimals: int = 18,
-    ) -> str:
-        """
-        Create a signature for a cross-chain trade
-
-        Args:
-            user_private_key: Private key of the signer
-            order_id: Unique order identifier (string, will be hashed to bytes32)
-            base_asset: Base asset address
-            quote_asset: Quote asset address
-            price: Price with decimals (e.g., 1.5 for 1.5 USDT per token)
-            quantity: Quantity with decimals
-            side: "bid" or "ask"
-            receive_wallet: Wallet address to receive funds on other chain
-            source_chain_id: Chain ID of source chain
-            destination_chain_id: Chain ID of destination chain
-            timestamp: Unix timestamp
-            nonce: User's nonce
-            price_decimals: Price decimals (default 18)
-            quantity_decimals: Quantity decimals (default 18)
-
-        Returns:
-            Signature as hex string
-        """
-        try:
-            account = Account.from_key(user_private_key)
-
-            # Convert order_id string to bytes32
-            if isinstance(order_id, str):
-                if order_id.startswith("0x"):
-                    order_id_bytes = bytes.fromhex(order_id[2:].zfill(64))
-                else:
-                    order_id_bytes = Web3.keccak(text=order_id)
-            else:
-                order_id_bytes = order_id
-
-            # Convert amounts to wei
-            price_wei = int(price * (10**price_decimals))
-            quantity_wei = int(quantity * (10**quantity_decimals))
-
-            # Create message hash matching contract
-            # Must match: keccak256(abi.encodePacked(...))
-            message_hash = Web3.keccak(
-                b"".join(
-                    [
-                        order_id_bytes,
-                        bytes.fromhex(
-                            Web3.to_checksum_address(base_asset)[2:].zfill(40)
-                        ),
-                        bytes.fromhex(
-                            Web3.to_checksum_address(quote_asset)[2:].zfill(40)
-                        ),
-                        price_wei.to_bytes(32, "big"),
-                        quantity_wei.to_bytes(32, "big"),
-                        # Solidity uses abi.encodePacked(string), so we must append raw UTF-8 bytes of the side string
-                        side.encode("utf-8"),
-                        bytes.fromhex(
-                            Web3.to_checksum_address(receive_wallet)[2:].zfill(40)
-                        ),
-                        source_chain_id.to_bytes(32, "big"),
-                        destination_chain_id.to_bytes(32, "big"),
-                        timestamp.to_bytes(32, "big"),
-                        nonce.to_bytes(32, "big"),
-                    ]
-                )
-            )
-
-            # Sign with Ethereum prefix
-            eth_message = encode_defunct(message_hash)
-            signature = account.sign_message(eth_message)
-
-            print(f"✅ Trade signature created for {account.address}")
-
-            return signature.signature.hex()
-
-        except Exception as e:
-            print(f"❌ Error creating trade signature: {e}")
-            raise
-
-    def create_matching_engine_signature(
-        self,
-        matching_engine_private_key: str,
-        order_id: str,
-        party1: str,
-        party2: str,
-        party1_receive_wallet: str,
-        party2_receive_wallet: str,
-        base_asset: str,
-        quote_asset: str,
-        price: float,
-        quantity: float,
-        is_source_chain: bool,
-        chain_id: int,
-        price_decimals: int = 18,
-        quantity_decimals: int = 18,
-    ) -> str:
-        """
-        Create matching engine signature for trade settlement
-
-        This signature authorizes the settlement on a specific chain.
-        Must be created by the contract owner (matching engine).
-
-        Args:
-            matching_engine_private_key: Private key of the matching engine (contract owner)
-            order_id: Order identifier
-            party1: Address of party 1
-            party2: Address of party 2
-            party1_receive_wallet: Party 1's receiving wallet
-            party2_receive_wallet: Party 2's receiving wallet
-            base_asset: Base asset address
-            quote_asset: Quote asset address
-            price: Trade price
-            quantity: Trade quantity
-            is_source_chain: True if settling on source chain, False for destination
-            chain_id: Current chain ID where settlement will occur
-            price_decimals: Price decimals
-            quantity_decimals: Quantity decimals
-
-        Returns:
-            Signature as hex string
-        """
-        try:
-            account = Account.from_key(matching_engine_private_key)
-
-            # Convert order_id to bytes32
-            if isinstance(order_id, str):
-                if order_id.startswith("0x"):
-                    order_id_bytes = bytes.fromhex(order_id[2:].zfill(64))
-                else:
-                    order_id_bytes = Web3.keccak(text=order_id)
-            else:
-                order_id_bytes = order_id
-
-            price_wei = int(price * (10**price_decimals))
-            quantity_wei = int(quantity * (10**quantity_decimals))
-
-            # Create hash matching contract verification
-            # Must match the contract's matching engine signature verification
-            message_hash = Web3.keccak(
-                b"".join(
-                    [
-                        order_id_bytes,
-                        bytes.fromhex(Web3.to_checksum_address(party1)[2:].zfill(40)),
-                        bytes.fromhex(Web3.to_checksum_address(party2)[2:].zfill(40)),
-                        bytes.fromhex(
-                            Web3.to_checksum_address(party1_receive_wallet)[2:].zfill(
-                                40
-                            )
-                        ),
-                        bytes.fromhex(
-                            Web3.to_checksum_address(party2_receive_wallet)[2:].zfill(
-                                40
-                            )
-                        ),
-                        bytes.fromhex(
-                            Web3.to_checksum_address(base_asset)[2:].zfill(40)
-                        ),
-                        bytes.fromhex(
-                            Web3.to_checksum_address(quote_asset)[2:].zfill(40)
-                        ),
-                        price_wei.to_bytes(32, "big"),
-                        quantity_wei.to_bytes(32, "big"),
-                        (1 if is_source_chain else 0).to_bytes(32, "big"),
-                        chain_id.to_bytes(32, "big"),
-                    ]
-                )
-            )
-
-            eth_message = encode_defunct(message_hash)
-            signature = account.sign_message(eth_message)
-
-            print(
-                f"✅ Matching engine signature created (Chain: {chain_id}, Source: {is_source_chain})"
-            )
-
-            return signature.signature.hex()
-
-        except Exception as e:
-            print(f"❌ Error creating matching engine signature: {e}")
-            raise
-
     # ==================== TRADE SETTLEMENT ====================
-
-    def settle_cross_chain_trade(
-        self,
-        order_id: str,
-        party1: str,
-        party2: str,
-        party1_receive_wallet: str,
-        party2_receive_wallet: str,
-        base_asset: str,
-        quote_asset: str,
-        price: float,
-        quantity: float,
-        party1_side: str,
-        party2_side: str,
-        source_chain_id: int,
-        destination_chain_id: int,
-        timestamp: int,
-        nonce1: int,
-        nonce2: int,
-        is_source_chain: bool,
-        price_decimals: int = 18,
-        quantity_decimals: int = 18,
-        gas_price_gwei: int = 20,
-    ) -> Dict:
-        """
-        Settle a cross-chain trade on this chain
-
-        This function must be called on BOTH chains to complete the atomic swap:
-        - On source chain (is_source_chain=True): Transfers base asset
-        - On destination chain (is_source_chain=False): Transfers quote asset
-
-        Args:
-            order_id: Unique order identifier
-            party1: Address of party 1 (on source chain)
-            party2: Address of party 2 (on destination chain)
-            party1_receive_wallet: Party 1's wallet on destination chain
-            party2_receive_wallet: Party 2's wallet on source chain
-            base_asset: Base asset address
-            quote_asset: Quote asset address
-            price: Trade price
-            quantity: Trade quantity
-            party1_side: "bid" or "ask"
-            party2_side: "ask" or "bid" (must be opposite)
-            source_chain_id: Source chain ID
-            destination_chain_id: Destination chain ID
-            timestamp: Trade timestamp
-            nonce1: Party 1's nonce
-            nonce2: Party 2's nonce
-            signature1: Party 1's signature
-            signature2: Party 2's signature
-            matching_engine_signature: Matching engine authorization signature
-            is_source_chain: True if this is the source chain, False if destination
-            price_decimals: Price decimals
-            quantity_decimals: Quantity decimals
-            gas_price_gwei: Gas price in gwei
-
-        Returns:
-            Transaction receipt dictionary
-        """
-        if not self.account:
-            raise ValueError("No private key provided for transaction signing")
-
-        try:
-            # Convert order_id to bytes32
-            if isinstance(order_id, str):
-                if order_id.startswith("0x"):
-                    order_id_bytes = bytes.fromhex(order_id[2:].zfill(64))
-                else:
-                    order_id_bytes = Web3.keccak(text=order_id)
-            else:
-                order_id_bytes = order_id
-
-            # Convert amounts to wei
-            price_wei = int(price * (10**price_decimals))
-            quantity_wei = int(quantity * (10**quantity_decimals))
-
-            # Build trade data tuple matching the contract struct
-            trade_data = (
-                order_id_bytes,
-                Web3.to_checksum_address(party1),
-                Web3.to_checksum_address(party2),
-                Web3.to_checksum_address(party1_receive_wallet),
-                Web3.to_checksum_address(party2_receive_wallet),
-                Web3.to_checksum_address(base_asset),
-                Web3.to_checksum_address(quote_asset),
-                price_wei,
-                quantity_wei,
-                party1_side,
-                party2_side,
-                source_chain_id,
-                destination_chain_id,
-                timestamp,
-                nonce1,
-                nonce2,
-            )
-
-            print(f"\n{'='*60}")
-            print(
-                f"🔄 Settling cross-chain trade on {'SOURCE' if is_source_chain else 'DESTINATION'} chain"
-            )
-            print(f"{'='*60}")
-            print(f"Order ID: {order_id}")
-            print(f"Party 1: {party1} ({party1_side})")
-            print(f"Party 2: {party2} ({party2_side})")
-            print(f"Price: {price}")
-            print(f"Quantity: {quantity}")
-            print(f"Chain ID: {self.web3.eth.chain_id}")
-            print(f"{'='*60}\n")
-
-            # Build function handle
-            function = self.contract.functions.settleCrossChainTrade(
-                trade_data, is_source_chain
-            )
-
-            # Preflight diagnostics (best-effort)
-            diagnostics = {}
-            try:
-                total_b, avail_b, locked_b = self.contract.functions.checkEscrowBalance(
-                    Web3.to_checksum_address(party1), Web3.to_checksum_address(base_asset)
-                ).call()
-                diagnostics["party1_base"] = {
-                    "total": int(total_b),
-                    "available": int(avail_b),
-                    "locked": int(locked_b),
-                }
-            except Exception:
-                pass
-            try:
-                total_q, avail_q, locked_q = self.contract.functions.checkEscrowBalance(
-                    Web3.to_checksum_address(party2), Web3.to_checksum_address(quote_asset)
-                ).call()
-                diagnostics["party2_quote"] = {
-                    "total": int(total_q),
-                    "available": int(avail_q),
-                    "locked": int(locked_q),
-                }
-            except Exception:
-                pass
-
-            # Static call to surface revert reasons before sending
-            try:
-                function.call({"from": self.account.address})
-            except Exception as pre_err:
-                return {
-                    "success": False,
-                    "error": f"preflight_revert: {pre_err}",
-                    "is_source_chain": is_source_chain,
-                    "chain_id": self.web3.eth.chain_id,
-                    "diagnostics": diagnostics,
-                }
-
-            # Estimate gas
-            try:
-                gas_estimate = function.estimate_gas({"from": self.account.address})
-                gas_limit = int(gas_estimate * 1.3)  # Add 30% buffer
-                print(f"⛽ Estimated gas: {gas_estimate}, using limit: {gas_limit}")
-            except Exception as gas_error:
-                print(f"⚠️  Gas estimation failed: {gas_error}")
-                gas_limit = 500000  # Fallback gas limit
-                print(f"⛽ Using fallback gas limit: {gas_limit}")
-
-            # Build transaction
-            tx = function.build_transaction(
-                {
-                    "from": self.account.address,
-                    "nonce": self.web3.eth.get_transaction_count(self.account.address),
-                    "gas": gas_limit,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                }
-            )
-
-            # Sign and send
-            signed_tx = self.web3.eth.account.sign_transaction(tx, self.account.key)
-            try:
-                tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
-            except Exception as send_err:
-                err_msg = str(send_err)
-                # Try getting revert detail via static call
-                try:
-                    function.call({"from": self.account.address})
-                except Exception as detail_err:
-                    err_msg = f"{err_msg} | detail: {detail_err}"
-                return {
-                    "success": False,
-                    "error": err_msg,
-                    "is_source_chain": is_source_chain,
-                    "chain_id": self.web3.eth.chain_id,
-                    "diagnostics": diagnostics,
-                }
-
-            print(f"🚀 Settlement transaction sent: {tx_hash.hex()}")
-            print("⏳ Waiting for confirmation...")
-
-            receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
-
-            if receipt.status == 1:
-                print(f"\n✅ TRADE SETTLED SUCCESSFULLY!")
-                print(f"   Gas used: {receipt.gasUsed}")
-                print(f"   Block: {receipt.blockNumber}")
-                print(f"   Transaction: {receipt.transactionHash.hex()}\n")
-            else:
-                print(f"\n❌ SETTLEMENT FAILED")
-                print(f"   Transaction: {receipt.transactionHash.hex()}\n")
-
-            return {
-                "success": receipt.status == 1,
-                "transaction_hash": receipt.transactionHash.hex(),
-                "gas_used": receipt.gasUsed,
-                "block_number": receipt.blockNumber,
-                "is_source_chain": is_source_chain,
-                "chain_id": self.web3.eth.chain_id,
-                "diagnostics": diagnostics,
-            }
-
-        except Exception as e:
-            print(f"\n❌ Settlement failed: {e}\n")
-            return {
-                "success": False,
-                "error": str(e),
-                "is_source_chain": is_source_chain,
-                "chain_id": self.web3.eth.chain_id,
-                "diagnostics": diagnostics if 'diagnostics' in locals() else {},
-            }
 
     def settle_same_chain_trade(
         self,
@@ -1006,16 +246,26 @@ class SettlementClient:
             diagnostics = {}
             try:
                 total_b, avail_b, locked_b = self.contract.functions.checkEscrowBalance(
-                    Web3.to_checksum_address(party1), Web3.to_checksum_address(base_asset)
+                    Web3.to_checksum_address(party1),
+                    Web3.to_checksum_address(base_asset),
                 ).call()
-                diagnostics["party1_base"] = {"total": int(total_b), "available": int(avail_b), "locked": int(locked_b)}
+                diagnostics["party1_base"] = {
+                    "total": int(total_b),
+                    "available": int(avail_b),
+                    "locked": int(locked_b),
+                }
             except Exception:
                 pass
             try:
                 total_q, avail_q, locked_q = self.contract.functions.checkEscrowBalance(
-                    Web3.to_checksum_address(party2), Web3.to_checksum_address(quote_asset)
+                    Web3.to_checksum_address(party2),
+                    Web3.to_checksum_address(quote_asset),
                 ).call()
-                diagnostics["party2_quote"] = {"total": int(total_q), "available": int(avail_q), "locked": int(locked_q)}
+                diagnostics["party2_quote"] = {
+                    "total": int(total_q),
+                    "available": int(avail_q),
+                    "locked": int(locked_q),
+                }
             except Exception:
                 pass
 
@@ -1023,7 +273,11 @@ class SettlementClient:
             try:
                 function.call({"from": self.account.address})
             except Exception as pre_err:
-                return {"success": False, "error": f"preflight_revert: {pre_err}", "diagnostics": diagnostics}
+                return {
+                    "success": False,
+                    "error": f"preflight_revert: {pre_err}",
+                    "diagnostics": diagnostics,
+                }
 
             # Gas
             try:
@@ -1051,16 +305,20 @@ class SettlementClient:
                 # Use conservative fee caps
                 max_priority = self.web3.to_wei(1, "gwei")
                 max_fee = int(base_fee) + int(max_priority) * 2
-                tx = function.build_transaction({
-                    **tx_common,
-                    "maxFeePerGas": max_fee,
-                    "maxPriorityFeePerGas": max_priority,
-                })
+                tx = function.build_transaction(
+                    {
+                        **tx_common,
+                        "maxFeePerGas": max_fee,
+                        "maxPriorityFeePerGas": max_priority,
+                    }
+                )
             else:
-                tx = function.build_transaction({
-                    **tx_common,
-                    "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
-                })
+                tx = function.build_transaction(
+                    {
+                        **tx_common,
+                        "gasPrice": self.web3.to_wei(gas_price_gwei, "gwei"),
+                    }
+                )
 
             signed_tx = self.web3.eth.account.sign_transaction(tx, self.account.key)
             try:
@@ -1231,3 +489,139 @@ class SettlementClient:
             pass
 
         print(f"{'='*60}\n")
+
+
+class SettlementClientCross:
+
+    def __init__(self, blockchain_rpc, private_key) -> None:
+        print(f"rpc {blockchain_rpc}, key {private_key}")
+        if not blockchain_rpc:
+            return "Blockchain RPC not provided"
+        self.web3 = Web3(Web3.HTTPProvider(blockchain_rpc))
+        if not self.web3.is_connected():
+            raise ConnectionError(f"Failed to connect to {blockchain_rpc}")
+
+        self.account = Account.from_key(private_key)
+        self.private_key = private_key
+
+    def check_escrow_balance(
+        self, settlement_address, user_address, token_address, chain_name
+    ):
+        try:
+            """Check escrow balance"""
+            if self.web3.is_connected():
+                print("its connected! ")
+            settlement_contract = self.web3.eth.contract(
+                address=Web3.to_checksum_address(settlement_address),
+                abi=TRADE_SETTLEMENT_ABI,
+            )
+            print(settlement_contract, user_address, token_address, "CHECK")
+            total, available, locked = settlement_contract.functions.checkEscrowBalance(
+                Web3.to_checksum_address(user_address),
+                Web3.to_checksum_address(token_address),
+            ).call()
+
+            print(f"📊 Escrow Balance on {chain_name}:")
+            print(f"   Total: {total}")
+            print(f"   Available: {available}")
+            print(f"   Locked: {locked}")
+
+            return total, available, locked
+
+        except Exception as error:
+            print(f"error {error}")
+
+    def settle_cross_chain_trade(
+        self,
+        settlement_address,
+        trade_data,
+        is_source_chain,
+        private_key,
+        chain_name,
+    ):
+        """Settle cross-chain trade"""
+        account = Account.from_key(private_key)
+        settlement_contract = self.web3.eth.contract(
+            address=Web3.to_checksum_address(settlement_address),
+            abi=TRADE_SETTLEMENT_ABI,
+        )
+
+        chain_type = "SOURCE" if is_source_chain else "DESTINATION"
+        print(f"🔄 Settling {chain_type} chain on {chain_name}...")
+
+        nonce = self.web3.eth.get_transaction_count(account.address)
+
+        # Convert dictionary to tuple in exact order matching the struct
+        trade_tuple = (
+            trade_data["orderId"],  # bytes32
+            trade_data["party1"],  # address
+            trade_data["party2"],  # address
+            trade_data["party1ReceiveWallet"],  # address
+            trade_data["party2ReceiveWallet"],  # address
+            trade_data["baseAsset"],  # address
+            trade_data["quoteAsset"],  # address
+            trade_data["price"],  # uint256
+            trade_data["quantity"],  # uint256
+            trade_data["party1Side"],  # string
+            trade_data["party2Side"],  # string
+            trade_data["sourceChainId"],  # uint256
+            trade_data["destinationChainId"],  # uint256
+            trade_data["timestamp"],  # uint256
+            trade_data["nonce1"],  # uint256
+            trade_data["nonce2"],  # uint256
+        )
+
+        tx = settlement_contract.functions.settleCrossChainTrade(
+            trade_tuple, is_source_chain
+        ).build_transaction(
+            {
+                "from": account.address,
+                "gas": 500000,
+                "gasPrice": self.web3.eth.gas_price,
+                "nonce": nonce,
+                "chainId": self.web3.eth.chain_id,
+            }
+        )
+
+        signed_tx = self.web3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = self.web3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
+        return self.wait_for_tx(tx_hash, chain_name)
+
+    def wait_for_tx(self, tx_hash, chain_name):
+        """Wait for transaction confirmation"""
+        print(f"⏳ Waiting for transaction on {chain_name}: {tx_hash.hex()}")
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
+        if receipt.status == 1:
+            print(f"✅ Transaction confirmed on {chain_name}")
+        else:
+            print(f"❌ Transaction failed on {chain_name}")
+        return {
+            "transactionHash": tx_hash.hex(),
+            "blockNumber": receipt.blockNumber,
+            "status": receipt.status,
+            "gasUsed": receipt.gasUsed,
+        }
+
+    def _prepare_trade_data(self, match: CrossChainMatch, supported_networks) -> Dict:
+        """Prepare trade data structure for settlement"""
+        return {
+            "orderId": f"0x{match.trade_id}",  # Convert to bytes32
+            "party1": match.source_order.account,
+            "party2": match.dest_order.account,
+            "party1ReceiveWallet": match.source_order.receive_wallet,
+            "party2ReceiveWallet": match.dest_order.receive_wallet,
+            "baseAsset": match.source_order.base_asset,  # Token address on source chain
+            "quoteAsset": match.dest_order.quote_asset,  # Token address on dest chain
+            "price": int(match.matched_price * Decimal("1e18")),  # Convert to wei
+            "quantity": int(match.matched_quantity * Decimal("1e18")),  # Convert to wei
+            "party1Side": match.source_order.side,
+            "party2Side": match.dest_order.side,
+            "sourceChainId": supported_networks[match.source_order.network]["chain_id"],
+            "destinationChainId": supported_networks[match.dest_order.network][
+                "chain_id"
+            ],
+            "timestamp": int(time.time()),
+            "nonce1": 0,  # Get from settlement contract
+            "nonce2": 0,  # Get from settlement contract
+        }

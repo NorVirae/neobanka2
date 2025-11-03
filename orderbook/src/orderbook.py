@@ -4,6 +4,8 @@ from collections import deque  # a faster insert/pop queue
 from six.moves import cStringIO as StringIO
 from decimal import Decimal
 import json
+
+from src.order import Order
 from .ordertree import OrderTree
 import time
 
@@ -46,7 +48,7 @@ class OrderBook(object):
                     self.process_limit_order(quote, from_data, verbose)
                 )
             except Exception as e:
-                return {"success": False, "message": str(e)}
+                raise Exception(str(e))
         else:
             sys.exit("order_type for process_order() is neither 'market' or 'limit'")
 
@@ -65,7 +67,7 @@ class OrderBook(object):
         trades = []
         quantity_to_trade = quantity_still_to_trade
         # Iterate through orders at this price level and try to match
-        current_order = order_list.head_order
+        current_order: Order = order_list.head_order
         while current_order is not None and quantity_to_trade > 0:
             head_order = current_order
             next_order = head_order.next_order
@@ -141,20 +143,22 @@ class OrderBook(object):
                     "bid",
                     head_order.order_id,
                     new_book_quantity,
-                    head_order.private_key,
+                    # head_order.private_key,
                     getattr(head_order, "from_network", None),
                     getattr(head_order, "to_network", None),
                     head_receive,
+                    head_order.__dict__
                 ]
                 transaction_record["party2"] = [
                     quote["trade_id"],
                     "ask",
                     None,
                     None,
-                    quote["private_key"],
+                    # quote["private_key"],
                     quote.get("from_network") if isinstance(quote, dict) else None,
                     quote.get("to_network") if isinstance(quote, dict) else None,
                     quote_receive,
+                    quote
                 ]
             else:
                 transaction_record["party1"] = [
@@ -162,20 +166,22 @@ class OrderBook(object):
                     "ask",
                     head_order.order_id,
                     new_book_quantity,
-                    head_order.private_key,
+                    # head_order.private_key,
                     getattr(head_order, "from_network", None),
                     getattr(head_order, "to_network", None),
                     head_receive,
+                    head_order.__dict__
                 ]
                 transaction_record["party2"] = [
                     quote["trade_id"],
                     "bid",
                     None,
                     None,
-                    quote["private_key"],
+                    # quote["private_key"],
                     quote.get("from_network") if isinstance(quote, dict) else None,
                     quote.get("to_network") if isinstance(quote, dict) else None,
                     quote_receive,
+                    quote
                 ]
 
             self.tape.append(transaction_record)

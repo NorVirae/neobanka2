@@ -24,7 +24,7 @@ import httpx
 from dataclasses import dataclass
 from enum import Enum
 
-from src.trade_settlement_client import SettlementClient
+from src.trade_settlement_client import SettlementClientSame
 from helper.api_helper import APIHelper
 
 # Configure logging
@@ -80,7 +80,7 @@ class CrossChainMarketMaker:
         }
         
         # Initialize settlement clients for each network
-        self.settlement_clients: Dict[NetworkType, SettlementClient] = {}
+        self.settlement_clients: Dict[NetworkType, SettlementClientSame] = {}
         self.private_key = os.getenv("PRIVATE_KEY")
         
         if not self.private_key:
@@ -101,7 +101,7 @@ class CrossChainMarketMaker:
         """Initialize settlement clients for each supported network"""
         for network_type, config in self.supported_networks.items():
             try:
-                client = SettlementClient(
+                client = SettlementClientSame(
                     web3_provider=config["rpc"],
                     contract_address=config["settlement"],
                     private_key=self.private_key
@@ -297,7 +297,7 @@ class CrossChainMarketMaker:
             "nonce2": 0   # Get from settlement contract
         }
     
-    async def _settle_on_chain(self, client: SettlementClient, trade_data: Dict, is_source: bool) -> bool:
+    async def _settle_on_chain(self, client: SettlementClientSame, trade_data: Dict, is_source: bool) -> bool:
         """Execute settlement on a specific chain"""
         try:
             # This would call the settleCrossChainTrade function on the smart contract
