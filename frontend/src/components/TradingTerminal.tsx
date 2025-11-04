@@ -76,7 +76,7 @@ const Card = ({ children, className = '', variant = 'default' }) => {
     minimal: 'bg-transparent border-t-2 border-t-neobanka-teal-500 pt-4',
     terminal: 'bg-neobanka-black-800 border border-neobanka-teal-600 rounded-lg font-mono'
   };
-  
+
   return (
     <div className={`${variants[variant]} ${className}`}>
       {children}
@@ -252,19 +252,19 @@ const TradingPanel = ({ account, onOrderSubmit, loading, fromNetwork, toNetwork,
           if (!needsAdd) throw switchErr;
           const params = targetKey === 'hedera'
             ? {
-                chainId: '0x' + CHAIN_REGISTRY.hedera.chainId.toString(16),
-                chainName: HEDERA_TESTNET.chainName,
-                nativeCurrency: HEDERA_TESTNET.nativeCurrency as any,
-                rpcUrls: (HEDERA_TESTNET.rpcUrls as any) || [],
-                blockExplorerUrls: HEDERA_TESTNET.blockExplorerUrls as any,
-              }
+              chainId: '0x' + CHAIN_REGISTRY.hedera.chainId.toString(16),
+              chainName: HEDERA_TESTNET.chainName,
+              nativeCurrency: HEDERA_TESTNET.nativeCurrency as any,
+              rpcUrls: (HEDERA_TESTNET.rpcUrls as any) || [],
+              blockExplorerUrls: HEDERA_TESTNET.blockExplorerUrls as any,
+            }
             : {
-                chainId: '0x' + CHAIN_REGISTRY.ethereum.chainId.toString(16),
-                chainName: 'Ethereum Sepolia',
-                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                rpcUrls: [CHAIN_REGISTRY.ethereum.rpc].filter(Boolean),
-                blockExplorerUrls: ['https://sepolia.etherscan.io'] as any,
-              };
+              chainId: '0x' + CHAIN_REGISTRY.ethereum.chainId.toString(16),
+              chainName: 'Ethereum Sepolia',
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+              rpcUrls: [CHAIN_REGISTRY.ethereum.rpc].filter(Boolean),
+              blockExplorerUrls: ['https://sepolia.etherscan.io'] as any,
+            };
           await eth.request({ method: 'wallet_addEthereumChain', params: [params] });
           await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: params.chainId }] });
         }
@@ -276,7 +276,7 @@ const TradingPanel = ({ account, onOrderSubmit, loading, fromNetwork, toNetwork,
             try {
               const net = await provider.getNetwork();
               if (Number(net.chainId) === CHAIN_REGISTRY[targetKey].chainId) break;
-            } catch {}
+            } catch { }
             await new Promise(r => setTimeout(r, 500));
           }
         }
@@ -350,7 +350,7 @@ const TradingPanel = ({ account, onOrderSubmit, loading, fromNetwork, toNetwork,
           price: priceToUse,
           quantity,
         });
-      } catch {}
+      } catch { }
 
       await onOrderSubmit({
         account,
@@ -377,7 +377,7 @@ const TradingPanel = ({ account, onOrderSubmit, loading, fromNetwork, toNetwork,
     const key = (fromNetwork || '').toLowerCase();
     if (key === 'hedera' || key === 'ethereum') {
       // fire-and-forget; guarded in switch function
-      switchOrAddNetwork(key as 'hedera' | 'ethereum').catch(() => {});
+      switchOrAddNetwork(key as 'hedera' | 'ethereum').catch(() => { });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromNetwork]);
@@ -422,19 +422,19 @@ const TradingPanel = ({ account, onOrderSubmit, loading, fromNetwork, toNetwork,
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
-                variant={isQuickActive('hedera','ethereum') ? 'default' : 'outline'}
+                variant={isQuickActive('hedera', 'ethereum') ? 'default' : 'outline'}
                 size="sm"
                 disabled={isSwitching}
-                onClick={async () => { setFromNetwork('hedera'); setToNetwork('ethereum'); try { await switchOrAddNetwork('hedera');  } catch(err) { console.error('Error switching to Hedera:', err); } }}
+                onClick={async () => { setFromNetwork('hedera'); setToNetwork('ethereum'); try { await switchOrAddNetwork('hedera'); } catch (err) { console.error('Error switching to Hedera:', err); } }}
               >
                 Hedera → Sepolia
               </Button>
               <Button
                 type="button"
-                variant={isQuickActive('ethereum','hedera') ? 'default' : 'outline'}
+                variant={isQuickActive('ethereum', 'hedera') ? 'default' : 'outline'}
                 size="sm"
                 disabled={isSwitching}
-                onClick={async () => { setFromNetwork('ethereum'); setToNetwork('hedera'); try { await switchOrAddNetwork('ethereum'); } catch {} }}
+                onClick={async () => { setFromNetwork('ethereum'); setToNetwork('hedera'); try { await switchOrAddNetwork('ethereum'); } catch { } }}
               >
                 Sepolia → Hedera
               </Button>
@@ -549,7 +549,7 @@ const TradingPanel = ({ account, onOrderSubmit, loading, fromNetwork, toNetwork,
             className="w-full"
             disabled={loading || !account || !price || !quantity}
             variant={side === 'buy' ? 'success' : 'destructive'}
-            onClick={() => {}}
+            onClick={() => { }}
           >
             {loading ? (
               <div className="flex items-center space-x-2">
@@ -615,6 +615,7 @@ const TerminalLog = ({ logs }) => {
 const OrderHistoryPanel = ({ symbol, useCross = false }) => {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -625,16 +626,25 @@ const OrderHistoryPanel = ({ symbol, useCross = false }) => {
           : await orderbookApi.getOrderHistory(symbol, 100);
         if (mounted) {
           const hist = Array.isArray(res?.history) ? res.history : [];
-          hist.sort((a: any, b: any) => (Number(b?.timestamp || 0) - Number(a?.timestamp || 0)));
-          setRows(hist);
+          // Normalize timestamps and sort
+          const normalized = hist.map(item => ({
+            ...item,
+            // Normalize to milliseconds - if timestamp is too small, it's in seconds
+            normalizedTimestamp: item.timestamp < 10000000000
+              ? item.timestamp * 1000
+              : item.timestamp
+          }));
+          normalized.sort((a, b) => b.normalizedTimestamp - a.normalizedTimestamp);
+          setRows(normalized);
         }
-      } catch {}
+      } catch { }
       setLoading(false);
     };
     load();
     const id = setInterval(load, 10000);
     return () => { mounted = false; clearInterval(id); };
   }, [symbol, useCross]);
+
   return (
     <Card variant="minimal" className="h-full">
       <CardHeader className="pb-3 px-0">
@@ -652,9 +662,12 @@ const OrderHistoryPanel = ({ symbol, useCross = false }) => {
           {rows.map((r, i) => {
             const short = (h?: string) => h ? `${h.substring(0, 10)}…${h.substring(h.length - 6)}` : '';
             const hasTx = !!(r.txHash || r.txHashSource || r.txHashDestination);
+            // Use normalized timestamp for display
+            const displayTime = new Date(r.normalizedTimestamp || r.timestamp || Date.now());
+
             return (
               <div key={i} className="flex justify-between items-center py-1 border-b border-border/40 gap-2">
-                <span className="text-muted-foreground">{new Date(r.timestamp || Date.now()).toLocaleTimeString()}</span>
+                <span className="text-muted-foreground">{displayTime.toLocaleTimeString()}</span>
                 <span>{r.type}</span>
                 <span>{r.symbol}</span>
                 <span>{r.side || ''}</span>
@@ -666,12 +679,12 @@ const OrderHistoryPanel = ({ symbol, useCross = false }) => {
                       <a href={`https://hashscan.io/testnet/transaction/${r.txHash}`} target="_blank" rel="noreferrer">{short(r.txHash)}</a>
                     ) : (
                       <span className="flex gap-1">
-                        {r.txHashSource && (
-                          <a href={`https://hashscan.io/testnet/transaction/${r.txHashSource}`} target="_blank" rel="noreferrer">src:{short(r.txHashSource)}</a>
-                        )}
-                        {r.txHashDestination && (
-                          <a href={`https://hashscan.io/testnet/transaction/${r.txHashDestination}`} target="_blank" rel="noreferrer">dst:{short(r.txHashDestination)}</a>
-                        )}
+                        {r.txHashSource && r.txHashDestination && r.txHashSourceChainName == "hedera" && r.txHashDestChainName == "ethereum" ? (
+                          <a href={`https://hashscan.io/testnet/transaction/0x${r.txHashSource}`} target="_blank" rel="noreferrer">src:{short(r.txHashSource)}</a>
+                        ) : (<a href={`https://sepolia.etherscan.io/tx/0x${r.txHashSource}`} target="_blank" rel="noreferrer">src:{short(r.txHashSource)}</a>)}
+                        {r.txHashSource && r.txHashDestination && r.txHashDestChainName == "hedera" && r.txHashSourceChainName == "ethereum" ? (
+                          <a href={`https://hashscan.io/testnet/transaction/0x${r.txHashDestination}`} target="_blank" rel="noreferrer">dst:{short(r.txHashDestination)}</a>
+                        ) : (<a href={`https://sepolia.etherscan.io/tx/0x${r.txHashDestination}`} target="_blank" rel="noreferrer">dst:{short(r.txHashDestination)}</a>)}
                       </span>
                     )}
                   </span>
@@ -967,7 +980,7 @@ export function TradingTerminal({ onSymbolChange, variant = 'same', symbolSuffix
         if (hed) addLog(`Hedera settlement ${formatAddress(hed)}`, 'success');
         const eth = resolveSettlementAddress('ethereum');
         if (eth) addLog(`Sepolia settlement ${formatAddress(eth)}`, 'success');
-      } catch {}
+      } catch { }
     }
   }, [isConnected, account]);
 
@@ -984,7 +997,7 @@ export function TradingTerminal({ onSymbolChange, variant = 'same', symbolSuffix
         (priceData) => {
           // Update individual price
           setAllMarketPrices(prev => ({ ...prev, [pair]: priceData }));
-          
+
           // Set main market price (default to HBAR_USDT)
           if (pair === 'HBAR_USDT') {
             setCurrentMarketPrice(priceData);
@@ -1057,7 +1070,7 @@ export function TradingTerminal({ onSymbolChange, variant = 'same', symbolSuffix
                   <div className="text-xs text-gray-400">Spot Trading</div>
                 </div>
               </div>
-              
+
               {/* Display all trading pairs */}
               <div className="flex items-center space-x-8">
                 {Object.entries(allMarketPrices).map(([symbol, priceData]) => (
@@ -1107,17 +1120,17 @@ export function TradingTerminal({ onSymbolChange, variant = 'same', symbolSuffix
                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
               </div>
             </div>
-            
+
             {/* Chart Content */}
             <div className="h-[300px]">
-              <TradingViewChart 
-                symbol={currentSymbol} 
+              <TradingViewChart
+                symbol={currentSymbol}
                 onSymbolChange={setCurrentSymbol}
                 className="h-full"
               />
             </div>
           </div>
-          
+
           {/* Trading Panel */}
           <TradingPanel
             account={account}

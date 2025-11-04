@@ -232,15 +232,15 @@ class APIHelper:
                 # Extract party information
                 party1_addr = trade["party1"][0]
                 party1_side = trade["party1"][1]
-                party1_from_network = trade["party1"][5] if len(trade["party1"]) > 5 else None
-                party1_to_network = trade["party1"][6] if len(trade["party1"]) > 6 else None
-                party1_receive_wallet = trade["party1"][7] if len(trade["party1"]) > 7 else party1_addr
+                party1_from_network = trade["party1"][4] if len(trade["party1"]) > 5 else None
+                party1_to_network = trade["party1"][5] if len(trade["party1"]) > 6 else None
+                party1_receive_wallet = trade["party1"][6] if len(trade["party1"]) > 7 else party1_addr
 
                 party2_addr = trade["party2"][0]
                 party2_side = trade["party2"][1]
-                party2_from_network = trade["party2"][5] if len(trade["party2"]) > 5 else None
-                party2_to_network = trade["party2"][6] if len(trade["party2"]) > 6 else None
-                party2_receive_wallet = trade["party2"][7] if len(trade["party2"]) > 7 else party2_addr
+                party2_from_network = trade["party2"][4] if len(trade["party2"]) > 5 else None
+                party2_to_network = trade["party2"][5] if len(trade["party2"]) > 6 else None
+                party2_receive_wallet = trade["party2"][6] if len(trade["party2"]) > 7 else party2_addr
 
                 # Normalize roles so that party1 is always ASK (seller of base) on the SOURCE chain,
                 # and party2 is always BID (buyer with quote) on the DESTINATION chain.

@@ -1,18 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <defs>
-    <style>
-      .letter { fill: #ffffff; }
-      .background { fill: #000000; }
-    </style>
-  </defs>
-
-  <!-- Background -->
-  <rect class="background" width="32" height="32" rx="4"/>
-
-  <!-- Letter H -->
-  <g class="letter">
-    <rect x="8" y="6" width="3" height="20"/>
-    <rect x="21" y="6" width="3" height="20"/>
-    <rect x="8" y="14.5" width="16" height="3"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMid meet">
+<g fill-rule="evenodd" fill-opacity="1">
+  <path d="M 271 313 L 214 588 L 218 623 L 287 627 L 301 616 L 333 464 L 343 454 L 458 623 L 759 627 L 793 605 L 834 419 L 579 418 L 568 404 L 576 371 L 590 356 L 846 355 L 850 326 L 835 304 L 532 304 L 516 324 L 488 468 L 477 479 L 363 306 L 288 301 Z" fill="#c92a2f" stroke="none"/>
+</g>
 </svg>

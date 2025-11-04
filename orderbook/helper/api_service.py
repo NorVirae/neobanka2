@@ -57,6 +57,16 @@ class APIService:
             logger.error(f"Failed to initialize settlement client: {e}")
             # You might want to exit here if settlement is critical
 
+    def decimal_to_float(self, obj):
+        """Recursively convert Decimal objects to float for JSON serialization"""
+        if isinstance(obj, Decimal):
+            return float(obj)
+        elif isinstance(obj, dict):
+            return {k: self.decimal_to_float(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.decimal_to_float(item) for item in obj]
+        return obj
+
     async def register_order(
         self,
         request: Request,
@@ -210,13 +220,13 @@ class APIService:
                         if trade["party1"][3] is not None
                         else None
                     ),
-                    trade["party1"][4],
+                    # trade["party1"][4],
                     # source network for party1
-                    trade["party1"][5] if len(trade["party1"]) > 5 else None,
+                    trade["party1"][4] if len(trade["party1"]) > 5 else None,
                     # destination network for party1
-                    trade["party1"][6] if len(trade["party1"]) > 6 else None,
+                    trade["party1"][5] if len(trade["party1"]) > 6 else None,
                     # receive wallet on destination chain for party1
-                    trade["party1"][7] if len(trade["party1"]) > 7 else None,
+                    trade["party1"][6] if len(trade["party1"]) > 7 else None,
                 ]
                 party2 = [
                     trade["party2"][0],
@@ -227,13 +237,13 @@ class APIService:
                         if trade["party2"][3] is not None
                         else None
                     ),
-                    trade["party2"][4],
+                    # trade["party2"][4],
                     # source network for party2 (where their assets originate)
-                    trade["party2"][5] if len(trade["party2"]) > 5 else None,
+                    trade["party2"][4] if len(trade["party2"]) > 5 else None,
                     # destination network for party2
-                    trade["party2"][6] if len(trade["party2"]) > 6 else None,
+                    trade["party2"][5] if len(trade["party2"]) > 6 else None,
                     # receive wallet on destination chain for party2
-                    trade["party2"][7] if len(trade["party2"]) > 7 else None,
+                    trade["party2"][6] if len(trade["party2"]) > 7 else None,
                 ]
 
                 converted_trade = {
@@ -455,19 +465,22 @@ class APIService:
             )
 
             return JSONResponse(
-                content={
-                    "message": "Order registered successfully",
-                    "order": order_dict,
-                    "nextBest": next_best_order_dict,
-                    "taskId": task_id,
-                    "validation_details": validation_result.get("checks", {}),
-                    "settlement_info": settlement_info,
-                    "status_code": 1,
-                },
+                content=self.decimal_to_float(
+                    {
+                        "message": "Order registered successfully",
+                        "order": order_dict,
+                        "nextBest": next_best_order_dict,
+                        "taskId": task_id,
+                        "validation_details": validation_result.get("checks", {}),
+                        "settlement_info": settlement_info,
+                        "status_code": 1,
+                    }
+                ),
                 status_code=200,
             )
 
         except Exception as e:
+            self.full_system_traceback(e)
             logger.error(f"Error in register_order: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -477,11 +490,13 @@ class APIService:
         supported_networks,
         private_key,
         order_books,
-        activity_log,
-        activity_file_path,
+        activity_log=None,
+        activity_file_path=None,
+        append_file=None,
     ):
         try:
-            body = await request.json()
+            print(request, "HELLO")
+            body = await APIHelper.handlePayloadJson(request)
 
             from_network = body["from_network"]
 
@@ -754,6 +769,7 @@ class APIService:
                         private_key=private_key,
                         chain_name=source_chain,
                     )
+                    result_source["chain_name"] = source_chain
 
                     # Settle on destination chain (where party2/bid is)
                     result_dest = dest_chain_client.settle_cross_chain_trade(
@@ -769,18 +785,67 @@ class APIService:
                         "trade_source_receipt": result_source,
                         "trade_dest_receipt": result_dest,
                     }
+                    result_dest["chain_name"] = dest_chain
+
                     result.append(trade_result)
+
+                    # Build record with optional tx hash fields; for same-chain we set txHash
+                    rec = {
+                        "type": "trade_executed",
+                        "symbol": symbol,
+                        "price": float(body["price"]),
+                        "quantity": float(body["quantity"]),
+                        "timestamp": int(trade_data["timestamp"] * 1000),
+                    }
+                    # transactionHash
+                    if trade_result["trade_source_receipt"]:
+                        rec["txHashSource"] = trade_result["trade_source_receipt"][
+                            "transactionHash"
+                        ]
+                        rec["txHashSourceChainName"] = trade_result[
+                            "trade_source_receipt"
+                        ]["chain_name"]
+                    if trade_result["trade_source_receipt"]:
+                        rec["txHashDestination"] = trade_result["trade_dest_receipt"][
+                            "transactionHash"
+                        ]
+                        rec["txHashDestChainName"] = trade_result["trade_dest_receipt"][
+                            "chain_name"
+                        ]
+
+                    if activity_log is not None:
+                        activity_log.append(rec)
+                    if append_file is not None:
+                        append_file(rec)
+
+            if order is not None:
+                # Log placement to in-memory and file
+                try:
+                    placement = {
+                        "type": "order_placed",
+                        "symbol": symbol,
+                        "orderId": order["orderId"],
+                        "account": order["account"],
+                        "side": order["side"],
+                        "price": order["price"],
+                        "quantity": order["quantity"],
+                        "timestamp": order["timestamp"],
+                    }
+                    if activity_log is not None:
+                        activity_log.append(placement)
+                    if append_file is not None:
+                        append_file(placement)
+                except Exception:
+                    pass
 
             # finish
             return {
-                "available": Web3.from_wei(available, "ether"),
-                "total": Web3.from_wei(total, "ether"),
-                "locked": Web3.from_wei(locked, "ether"),
-                # "trades": trades,
-                "order": order,
-                "task_id": task_id,
-                "next_best_order": next_best_order,
-                "result": result,
+                "message": "Order registered successfully",
+                "order": body,
+                "taskId": task_id,
+                "nextBest": next_best_order,
+                "settlement_info": result,
+                "status_code": 1,
             }
         except Exception as error:
             self.full_system_traceback(error)
